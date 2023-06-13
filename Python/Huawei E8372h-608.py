@@ -186,6 +186,12 @@ def print_api_data_every_1_seconds(url1, url2):
     finally:
         curses.echo()
         curses.endwin()
+        
+        
+url1 = "http://192.168.8.1/api/monitoring/status"
+url2 = "http://192.168.8.1/api/monitoring/traffic-statistics"
+os.system('cls' if os.name == 'nt' else 'clear')  # Limpa a tela
+print_api_data_every_1_seconds(url1, url2)
 
 # def print_api_data_every_1_seconds(url1, url2):
     # desired_keys = ['ConnectionStatus', 'SignalIcon', 'WanIPAddress', 'PrimaryDns', 'SecondaryDns', 'CurrentWifiUser', 'SimStatus', 'WifiStatus']
@@ -212,7 +218,31 @@ def print_api_data_every_1_seconds(url1, url2):
     # except KeyboardInterrupt:
         # print("\nProgram interrupted by user. Exiting...")
         
-url1 = "http://192.168.8.1/api/monitoring/status"
-url2 = "http://192.168.8.1/api/monitoring/traffic-statistics"
-os.system('cls' if os.name == 'nt' else 'clear')  # Limpa a tela
-print_api_data_every_1_seconds(url1, url2)
+# def print_api_data_every_1_seconds(url1, url2):
+    # desired_keys = ['ConnectionStatus', 'SignalIcon', 'WanIPAddress', 'PrimaryDns', 'SecondaryDns', 'CurrentWifiUser', 'SimStatus', 'WifiStatus']
+    
+    # try:
+        # while True:
+            # os.system('cls' if os.name == 'nt' else 'clear')  # Clear the console
+
+            # # Dados da primeira API
+            # xml_data1 = get_api_data(url1)
+            # data1 = parse_xml(xml_data1)
+            # result_str = ''
+            # for key, value in data1.items():
+                # if key in desired_keys and value is not None:
+                    # result_str += f"{key}: {value}\n"
+            
+            # # Dados da segunda API
+            # xml_data2 = get_api_data(url2)
+            # data2 = parse_xml(xml_data2)
+            # data2 = format_traffic_data(data2)
+            # for key, value in data2.items():
+                # result_str += f"{key}: {value}\n"
+                
+            # print(result_str)
+
+            # time.sleep(1)
+
+    # except KeyboardInterrupt:
+        # print("\nProgram interrupted by user. Exiting...")
