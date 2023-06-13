@@ -3,7 +3,15 @@ import xml.etree.ElementTree as ET
 import time
 import os
 import curses
+from tkinter import messagebox
+import tkinter as tk
 
+def show_critical_message(message):
+    root = tk.Tk()
+    root.withdraw()  # Esconde a janela principal
+    messagebox.showwarning("Alerta:", message)  # Exibe a caixa de mensagem
+    root.destroy()  # Destrói o objeto Tk após fechar a caixa de mensagem
+    
 def get_new_session_id():
     while True:
         try:
@@ -11,7 +19,7 @@ def get_new_session_id():
                 s.get('http://192.168.8.1/html/home.html')  # A URL que define o SessionID
                 cookies = s.cookies.get_dict()
                 session_id = cookies.get('SessionID')
-                print('Novos Cookies OK.')
+                show_critical_message('Novos Cookies OK.')
 
             if not session_id:
                 raise Exception('Não foi possível obter o SessionID.')
