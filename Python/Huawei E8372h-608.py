@@ -2,53 +2,72 @@ import requests
 import xml.etree.ElementTree as ET
 import time
 import os
+import curses
+
+def get_new_session_id():
+    while True:
+        try:
+            with requests.Session() as s:
+                s.get('http://192.168.8.1/html/home.html')  # A URL que define o SessionID
+                cookies = s.cookies.get_dict()
+                session_id = cookies.get('SessionID')
+                print('Novos Cookies OK.')
+
+            if not session_id:
+                raise Exception('Não foi possível obter o SessionID.')
+            
+            return session_id
+        except (requests.exceptions.HTTPError, requests.exceptions.Timeout, Exception):
+            print('Ocorreu um erro ao obter o SessionID. Tentando novamente...')
+            time.sleep(1)
 
 def is_online(url):
     try:
         response = requests.get(url, timeout=3)
         response.raise_for_status()  # Verifica se a resposta foi bem-sucedida
+        print('O HOST está online.')
         return True
     except requests.exceptions.HTTPError as http_err:
         print(f'Ocorreu um erro HTTP: {http_err}')
+        return False
     except requests.exceptions.Timeout:
         print(f'Erro de tempo limite. URL {url} pode estar offline.')
+        return False
     except Exception as err:
         print(f'Ocorreu um erro: {err}')
-    return False
+        return False
 
-def get_new_session_id():
-    with requests.Session() as s:
-        s.get('http://192.168.8.1/html/home.html')  # A URL que define o SessionID
-        cookies = s.cookies.get_dict()
-        session_id = cookies.get('SessionID')
-        
-    if not session_id:
-        raise Exception('Não foi possível obter o SessionID.')
-    
-    return session_id
+
+session_id = None
+headers = {}
 
 def get_api_data(url):
-    while not is_online('http://192.168.8.1/html/home.html'):
-        print('Aguardando o HOST ficar online...')
-        time.sleep(1)
-
-    session_id = get_new_session_id()
-    headers = {
-        'Cookie': f'SessionID={session_id}'
-    }
+    global session_id
+    global headers
 
     while True:
+        # Try to get a new session_id only if it's not set yet
+        if not session_id and not is_online('http://192.168.8.1/html/home.html'):
+            print('O HOST está offline. Tentando novamente...')
+            time.sleep(1)
+            continue
+        elif not session_id:
+            session_id = get_new_session_id()
+            headers = {'Cookie': f'SessionID={session_id}'}
+
         try:
             response = requests.get(url, headers=headers, timeout=3)
             response.raise_for_status()
         except requests.exceptions.HTTPError as http_err:
             print(f'Ocorreu um erro HTTP: {http_err}')
+            session_id = None  # Force the acquisition of a new session_id on the next attempt
         except requests.exceptions.Timeout:
             print('Ocorreu um erro de tempo limite. Tentando novamente...')
             time.sleep(1)
             continue
         except Exception as err:
             print(f'Ocorreu um erro: {err}')
+            continue
         else:
             return response.content
 
@@ -122,8 +141,6 @@ def format_traffic_data(data):
 
     return data
 
-import curses
-
 def print_api_data_every_1_seconds(url1, url2):
     desired_keys = ['ConnectionStatus', 'SignalIcon', 'WanIPAddress', 'PrimaryDns', 'SecondaryDns', 'CurrentWifiUser', 'SimStatus', 'WifiStatus']
     
@@ -161,6 +178,31 @@ def print_api_data_every_1_seconds(url1, url2):
     finally:
         curses.echo()
         curses.endwin()
+
+# def print_api_data_every_1_seconds(url1, url2):
+    # desired_keys = ['ConnectionStatus', 'SignalIcon', 'WanIPAddress', 'PrimaryDns', 'SecondaryDns', 'CurrentWifiUser', 'SimStatus', 'WifiStatus']
+    
+    # try:
+        # while True:
+            # os.system('cls' if os.name == 'nt' else 'clear')  # Clear the console
+            # # Dados da primeira API
+            # xml_data1 = get_api_data(url1)
+            # data1 = parse_xml(xml_data1)
+            # for key, value in data1.items():
+                # if key in desired_keys and value is not None:
+                    # print(f"{key}: {value}")
+            
+            # # Dados da segunda API
+            # xml_data2 = get_api_data(url2)
+            # data2 = parse_xml(xml_data2)
+            # data2 = format_traffic_data(data2)
+            # for key, value in data2.items():
+                # print(f"{key}: {value}")
+                
+            # time.sleep(1)
+
+    # except KeyboardInterrupt:
+        # print("\nProgram interrupted by user. Exiting...")
         
 url1 = "http://192.168.8.1/api/monitoring/status"
 url2 = "http://192.168.8.1/api/monitoring/traffic-statistics"
