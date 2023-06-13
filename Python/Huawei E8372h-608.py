@@ -2,7 +2,19 @@ import requests
 import xml.etree.ElementTree as ET
 import time
 import os
-from tqdm import tqdm
+
+def is_online(url):
+    try:
+        response = requests.get(url, timeout=3)
+        response.raise_for_status()  # Verifica se a resposta foi bem-sucedida
+        return True
+    except requests.exceptions.HTTPError as http_err:
+        print(f'Ocorreu um erro HTTP: {http_err}')
+    except requests.exceptions.Timeout:
+        print(f'Erro de tempo limite. URL {url} pode estar offline.')
+    except Exception as err:
+        print(f'Ocorreu um erro: {err}')
+    return False
 
 def get_new_session_id():
     with requests.Session() as s:
@@ -16,6 +28,10 @@ def get_new_session_id():
     return session_id
 
 def get_api_data(url):
+    while not is_online('http://192.168.8.1/html/home.html'):
+        print('Aguardando o HOST ficar online...')
+        time.sleep(1)
+
     session_id = get_new_session_id()
     headers = {
         'Cookie': f'SessionID={session_id}'
@@ -32,11 +48,9 @@ def get_api_data(url):
             time.sleep(1)
             continue
         except Exception as err:
-            print(f'Ocorreu um outro erro: {err}')
+            print(f'Ocorreu um erro: {err}')
         else:
             return response.content
-
-
 
 def parse_xml(xml):
     root = ET.fromstring(xml)
