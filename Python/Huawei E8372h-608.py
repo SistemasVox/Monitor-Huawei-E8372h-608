@@ -18,18 +18,7 @@ def get_new_session_id():
 def get_api_data(url):
     session_id = get_new_session_id()
     headers = {
-        'Accept': '*/*',
-        'Accept-Encoding': 'gzip, deflate',
-        'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
-        'Cache-Control': 'no-cache',
-        'Connection': 'keep-alive',
-        'Cookie': f'SessionID={session_id}',
-        'DNT': '1',
-        'Host': '192.168.8.1',
-        'Pragma': 'no-cache',
-        'Referer': 'http://192.168.8.1/html/home.html',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/113.0.0.0 Safari/537.36 OPR/99.0.0.0',
-        'X-Requested-With': 'XMLHttpRequest',
+        'Cookie': f'SessionID={session_id}'
     }
 
     while True:
