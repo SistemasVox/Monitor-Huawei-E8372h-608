@@ -72,9 +72,11 @@ def get_api_data(url):
         except requests.exceptions.Timeout:
             print('Ocorreu um erro de tempo limite. Tentando novamente...')
             time.sleep(1)
+            session_id = None
             continue
         except Exception as err:
             print(f'Ocorreu um erro: {err}')
+            session_id = None
             continue
         else:
             return response.content
@@ -149,44 +151,72 @@ def format_traffic_data(data):
 
     return data
 
+# def print_api_data_every_1_seconds(url1, url2):
+    # desired_keys = ['ConnectionStatus', 'SignalIcon', 'WanIPAddress', 'PrimaryDns', 'SecondaryDns', 'CurrentWifiUser', 'SimStatus', 'WifiStatus']
+    
+    # stdscr = curses.initscr()  # Inicia o módulo curses
+    # curses.noecho()  # Desliga o eco automático de keys para a tela
+    # curses.curs_set(0)  # Esconde o cursor
+
+    # try:
+        # while True:
+            # # Redimensiona a janela para as novas dimensões do terminal
+            # curses.resize_term(0, 0)
+            
+            # # Dados da primeira API
+            # xml_data1 = get_api_data(url1)
+            # data1 = parse_xml(xml_data1)
+            # h, w = stdscr.getmaxyx()  # Obtém as dimensões da tela
+            # count = 0
+            # for key, value in data1.items():
+                # if key in desired_keys and value is not None and count < h:
+                    # stdscr.addstr(count, 0, f"{key}: {value}" + ' ' * (w - len(f"{key}: {value}")))  # Adiciona uma string na posição especificada
+                    # count += 1
+            
+            # # Dados da segunda API
+            # xml_data2 = get_api_data(url2)
+            # data2 = parse_xml(xml_data2)
+            # data2 = format_traffic_data(data2)
+            # for key, value in data2.items():
+                # if count < h:
+                    # stdscr.addstr(count, 0, f"{key}: {value}" + ' ' * (w - len(f"{key}: {value}")))
+                    # count += 1
+
+            # stdscr.refresh()  # Atualiza a tela com o novo conteúdo
+            # time.sleep(1)
+
+    # finally:
+        # curses.echo()
+        # curses.endwin()
+        
 def print_api_data_every_1_seconds(url1, url2):
     desired_keys = ['ConnectionStatus', 'SignalIcon', 'WanIPAddress', 'PrimaryDns', 'SecondaryDns', 'CurrentWifiUser', 'SimStatus', 'WifiStatus']
     
-    stdscr = curses.initscr()  # Inicia o módulo curses
-    curses.noecho()  # Desliga o eco automático de keys para a tela
-    curses.curs_set(0)  # Esconde o cursor
-
     try:
         while True:
-            # Redimensiona a janela para as novas dimensões do terminal
-            curses.resize_term(0, 0)
-            
+            os.system('cls' if os.name == 'nt' else 'clear')  # Clear the console
+
             # Dados da primeira API
             xml_data1 = get_api_data(url1)
             data1 = parse_xml(xml_data1)
-            h, w = stdscr.getmaxyx()  # Obtém as dimensões da tela
-            count = 0
+            result_str = ''
             for key, value in data1.items():
-                if key in desired_keys and value is not None and count < h:
-                    stdscr.addstr(count, 0, f"{key}: {value}" + ' ' * (w - len(f"{key}: {value}")))  # Adiciona uma string na posição especificada
-                    count += 1
+                if key in desired_keys and value is not None:
+                    result_str += f"{key}: {value}\n"
             
             # Dados da segunda API
             xml_data2 = get_api_data(url2)
             data2 = parse_xml(xml_data2)
             data2 = format_traffic_data(data2)
             for key, value in data2.items():
-                if count < h:
-                    stdscr.addstr(count, 0, f"{key}: {value}" + ' ' * (w - len(f"{key}: {value}")))
-                    count += 1
+                result_str += f"{key}: {value}\n"
+                
+            print(result_str)
 
-            stdscr.refresh()  # Atualiza a tela com o novo conteúdo
-            time.sleep(1)
+            time.sleep(2)
 
-    finally:
-        curses.echo()
-        curses.endwin()
-        
+    except KeyboardInterrupt:
+        print("\nProgram interrupted by user. Exiting...")  
         
 url1 = "http://192.168.8.1/api/monitoring/status"
 url2 = "http://192.168.8.1/api/monitoring/traffic-statistics"
@@ -218,31 +248,4 @@ print_api_data_every_1_seconds(url1, url2)
     # except KeyboardInterrupt:
         # print("\nProgram interrupted by user. Exiting...")
         
-# def print_api_data_every_1_seconds(url1, url2):
-    # desired_keys = ['ConnectionStatus', 'SignalIcon', 'WanIPAddress', 'PrimaryDns', 'SecondaryDns', 'CurrentWifiUser', 'SimStatus', 'WifiStatus']
-    
-    # try:
-        # while True:
-            # os.system('cls' if os.name == 'nt' else 'clear')  # Clear the console
 
-            # # Dados da primeira API
-            # xml_data1 = get_api_data(url1)
-            # data1 = parse_xml(xml_data1)
-            # result_str = ''
-            # for key, value in data1.items():
-                # if key in desired_keys and value is not None:
-                    # result_str += f"{key}: {value}\n"
-            
-            # # Dados da segunda API
-            # xml_data2 = get_api_data(url2)
-            # data2 = parse_xml(xml_data2)
-            # data2 = format_traffic_data(data2)
-            # for key, value in data2.items():
-                # result_str += f"{key}: {value}\n"
-                
-            # print(result_str)
-
-            # time.sleep(1)
-
-    # except KeyboardInterrupt:
-        # print("\nProgram interrupted by user. Exiting...")
