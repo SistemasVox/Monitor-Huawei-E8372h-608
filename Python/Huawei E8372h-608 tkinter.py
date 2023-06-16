@@ -5,6 +5,14 @@ import os
 import tkinter as tk
 from tkinter import ttk
 
+def add_message(message):
+    global tree
+    # Limpa o Treeview
+    for i in tree.get_children():
+        tree.delete(i)
+    num_children = len(tree.get_children())
+    tree.insert('', 'end', values=('Message', message), tags=('evenrow' if num_children % 2 == 0 else 'oddrow'))
+
 def show_critical_message(message):
     root = tk.Tk()
     root.withdraw()  # Esconde a janela principal
@@ -24,23 +32,23 @@ def get_new_session_id():
             
             return session_id
         except (requests.exceptions.HTTPError, requests.exceptions.Timeout, Exception):
-            print('Ocorreu um erro ao obter o SessionID. Tentando novamente...')
+            add_message('Ocorreu um erro ao obter o SessionID. Tentando novamente...')
             time.sleep(1)
 
 def is_online(url):
     try:
         response = requests.get(url, timeout=3)
         response.raise_for_status()  # Verifica se a resposta foi bem-sucedida
-        print('O HOST está online.')
+        add_message('O HOST está online.')
         return True
     except requests.exceptions.HTTPError as http_err:
-        print(f'Ocorreu um erro HTTP: {http_err}')
+        add_message(f'Ocorreu um erro HTTP: {http_err}')
         return False
     except requests.exceptions.Timeout:
-        print(f'Erro de tempo limite. URL {url} pode estar offline.')
+        add_message(f'Erro de tempo limite. URL {url} pode estar offline.')
         return False
     except Exception as err:
-        print(f'Ocorreu um erro: {err}')
+        add_message(f'Ocorreu um erro: {err}')
         return False
 
 
@@ -53,7 +61,7 @@ def get_api_data(url):
 
     # Try to get a new session_id only if it's not set yet
     if not session_id and not is_online('http://192.168.8.1/html/home.html'):
-        print('O HOST está offline. Tentando novamente...')
+        add_message('O HOST está offline. Tentando novamente...')
         time.sleep(1)
     elif not session_id:
         session_id = get_new_session_id()
@@ -63,14 +71,14 @@ def get_api_data(url):
         response = requests.get(url, headers=headers, timeout=3)
         response.raise_for_status()
     except requests.exceptions.HTTPError as http_err:
-        print(f'Ocorreu um erro HTTP: {http_err}')
+        add_message(f'Ocorreu um erro HTTP: {http_err}')
         session_id = None  # Force the acquisition of a new session_id on the next attempt
     except requests.exceptions.Timeout:
-        print('Ocorreu um erro de tempo limite. Tentando novamente...')
+        add_message('Ocorreu um erro de tempo limite. Tentando novamente...')
         time.sleep(1)
         session_id = None
     except Exception as err:
-        print(f'Ocorreu um erro: {err}')
+        add_message(f'Ocorreu um erro: {err}')
         session_id = None
     else:
         return response.content
@@ -118,19 +126,56 @@ def humanize_bytes(size):
         unit += 1
     return f"{size:.2f} {units[unit]}"
 
+previous_upload_rate = None
+last_upload_rate_arrow = "\u2192"
+previous_download_rate = None
+last_download_rate_arrow = "\u2192"
 
 def format_traffic_data(data):
+    global previous_upload_rate, last_upload_rate_arrow, previous_download_rate, last_download_rate_arrow
+
     # Conversões de unidades
     for key in ['CurrentUpload', 'CurrentDownload', 'TotalUpload', 'TotalDownload']:
         if key in data:
-            # Converte bytes para megabytes
-            data[key] = humanize_bytes(int(data[key]))
+            # Converte bytes para megabytes e adiciona a taxa média se aplicável
+            if key in ['CurrentUpload', 'CurrentDownload'] and 'CurrentConnectTime' in data:
+                mins, secs = divmod(int(data['CurrentConnectTime']), 60)
+                hours, mins = divmod(mins, 60)
+                connect_time_seconds = hours * 3600 + mins * 60 + secs # Convertendo o tempo de conexão atual para segundos
+                average_rate = humanize_bytes_rate(int(data[key]) / connect_time_seconds) if connect_time_seconds > 0 else "0"
+                data[key] = f"{humanize_bytes(int(data[key]))}. {average_rate}"
+            else:
+                data[key] = humanize_bytes(int(data[key]))
 
     for key in ['CurrentUploadRate', 'CurrentDownloadRate']:
         if key in data:
             # Converte bytes por segundo para kilobytes por segundo
-            data[key] = humanize_bytes_rate(int(data[key]))
-    
+            new_rate = humanize_bytes_rate(int(data[key]))
+
+            # Adiciona seta ao final do valor
+            if key == 'CurrentUploadRate':
+                if previous_upload_rate is not None:
+                    if new_rate > previous_upload_rate:
+                        last_upload_rate_arrow = "\u2191"  # seta para cima
+                    elif new_rate < previous_upload_rate:
+                        last_upload_rate_arrow = "\u2193"  # seta para baixo
+                    else:
+                        last_upload_rate_arrow = "\u2192"  # seta direita
+                previous_upload_rate = new_rate
+                data[key] = f"{new_rate} {last_upload_rate_arrow}"
+
+            elif key == 'CurrentDownloadRate':
+                if previous_download_rate is not None:
+                    if new_rate > previous_download_rate:
+                        last_download_rate_arrow = "\u2191"  # seta para cima
+                    elif new_rate < previous_download_rate:
+                        last_download_rate_arrow = "\u2193"  # seta para baixo
+                    else:
+                        last_download_rate_arrow = "\u2192"  # seta direita
+                previous_download_rate = new_rate
+                data[key] = f"{new_rate} {last_download_rate_arrow}"
+
+    # Conversão de tempo restante
     if 'CurrentConnectTime' in data:
         # Converte segundos para um formato mais legível
         mins, secs = divmod(int(data['CurrentConnectTime']), 60)
@@ -146,36 +191,111 @@ def format_traffic_data(data):
 
     return data
 
+previous_level = None
+last_arrow = ""
+
+def get_signal_level(level):
+    global previous_level
+    global last_arrow
+
+    symbols = {
+        '1': u'\u2581',
+        '2': u'\u2581' + u'\u2583',
+        '3': u'\u2581' + u'\u2583' + u'\u2584',
+        '4': u'\u2581' + u'\u2583' + u'\u2584' + u'\u2586',
+        '5': u'\u2581' + u'\u2583' + u'\u2584' + u'\u2586' + u'\u2588'
+    }
+
+    signal = level + " " + symbols.get(level, '-')
+
+    if previous_level is not None and level != previous_level:
+        if int(level) > int(previous_level):
+            last_arrow = "\u2191" # seta para cima
+        elif int(level) < int(previous_level):
+            last_arrow = "\u2193" # seta para baixo
+            
+    previous_level = level
+
+    signal += " " + last_arrow
+    return signal
+
+
 def get_data():
-    url1 = "http://192.168.8.1/api/monitoring/status"
-    url2 = "http://192.168.8.1/api/monitoring/traffic-statistics"
+    info = {}  # Definimos 'info' fora do bloco try para que possamos acessá-lo no bloco except
+    try:
+        url1 = "http://192.168.8.1/api/monitoring/status"
+        url2 = "http://192.168.8.1/api/monitoring/traffic-statistics"
 
-    desired_keys = ['ConnectionStatus', 'SignalIcon', 'WanIPAddress', 'PrimaryDns', 'SecondaryDns', 'CurrentWifiUser', 'SimStatus', 'WifiStatus']
+        desired_keys = ['ConnectionStatus', 'SignalIcon', 'WanIPAddress', 'PrimaryDns', 'SecondaryDns', 'CurrentWifiUser', 'SimStatus', 'WifiStatus']
 
-    # Dados da primeira API
-    xml_data1 = get_api_data(url1)
-    data1 = parse_xml(xml_data1)
-    info = {}
-    for key, value in data1.items():
-        if key in desired_keys and value is not None:
+        # Dados da primeira API
+        xml_data1 = get_api_data(url1)
+        data1 = parse_xml(xml_data1)
+        for key, value in data1.items():
+            if key in desired_keys and value is not None:
+                info[key] = value
+
+        # Se 'ConnectionStatus' estiver em info, substitua seu valor
+        if 'ConnectionStatus' in info:
+            info['ConnectionStatus'] = get_connection_status(info['ConnectionStatus'])
+
+        # Se 'SignalIcon' estiver em info, substitua seu valor
+        if 'SignalIcon' in info:
+            info['SignalIcon'] = get_signal_level(info['SignalIcon'])
+
+        # Dados da segunda API
+        xml_data2 = get_api_data(url2)
+        data2 = parse_xml(xml_data2)
+        data2 = format_traffic_data(data2)
+        for key, value in data2.items():
             info[key] = value
 
-    # Dados da segunda API
-    xml_data2 = get_api_data(url2)
-    data2 = parse_xml(xml_data2)
-    data2 = format_traffic_data(data2)
-    for key, value in data2.items():
-        info[key] = value
+        return info
+    except Exception as e:
+        print(f"Ocorreu um erro durante a execução: {e}")
+        info['Erro'] = str(e)  # Adiciona a mensagem de erro à chave 'Erro'
+        return info
 
-    return info
-
+def get_connection_status(status):
+    estados = {
+        '2': 'Falha na conexão, o perfil é inválido',
+        '3': 'Falha na conexão, o perfil é inválido',
+        '5': 'Falha na conexão, o perfil é inválido',
+        '8': 'Falha na conexão, o perfil é inválido',
+        '20': 'Falha na conexão, o perfil é inválido',
+        '21': 'Falha na conexão, o perfil é inválido',
+        '23': 'Falha na conexão, o perfil é inválido',
+        '27': 'Falha na conexão, o perfil é inválido',
+        '28': 'Falha na conexão, o perfil é inválido',
+        '29': 'Falha na conexão, o perfil é inválido',
+        '30': 'Falha na conexão, o perfil é inválido',
+        '31': 'Falha na conexão, o perfil é inválido',
+        '32': 'Falha na conexão, o perfil é inválido',
+        '33': 'Falha na conexão, o perfil é inválido',
+        '7': 'Acesso à rede não permitido',
+        '11': 'Acesso à rede não permitido',
+        '14': 'Acesso à rede não permitido',
+        '37': 'Acesso à rede não permitido',
+        '12': 'Falha na conexão, roaming não permitido',
+        '13': 'Falha na conexão, roaming não permitido',
+        '201': 'Falha na conexão, largura de banda excedida',
+        '900': 'Conectando',
+        '901': 'Conectado',
+        '902': 'Desconectado',
+        '903': 'Desconectando',
+        '904': 'Falha na conexão ou desativada',
+    }
+    return estados.get(status, status)  # retorna o status se não encontrar uma correspondência no dicionário
+    
 def action_button():
     # Desativar o botão "Atualizar" enquanto a função está sendo executada
     button2.config(state='disabled')
 
-    info = get_data()
+    # Limpa o Treeview
     for i in tree.get_children():
         tree.delete(i)
+
+    info = get_data()
     for i, (key, value) in enumerate(info.items()):
         tree.insert('', 'end', values=(key, value), tags=('oddrow' if i % 2 else 'evenrow',))
 
@@ -197,7 +317,7 @@ def copy_to_clipboard(event):
     root.clipboard_append(selected_value)
 
 root = tk.Tk()
-root.geometry('800x400')
+root.geometry('600x400')
 root.title("Huawei E8372h-608")
 
 
